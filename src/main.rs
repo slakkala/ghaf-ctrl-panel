@@ -9,6 +9,7 @@ mod vm_settings;
 mod audio_settings;
 mod settings;
 mod settings_gobject;
+mod data_gobject;
 mod data_provider;
 mod security_icon;
 mod admin_settings_page;

@@ -43,14 +43,9 @@
             <property name="valign">center</property>
             <property name="width-request">220</property>
             <property name="height-request">30</property>
-            <property name="model">
-              <object class="GtkStringList">
-                <items>
-                  <item translatable="yes">English (United States)</item>
-                  <item translatable="yes">Arabic (UAE)</item>
-                </items>
-              </object>
-            </property>
+	    <property name="expression">
+              <lookup name="display" type="DataGObject"/>
+	    </property>
           </object>
         </child>
       </object>
@@ -78,14 +73,9 @@
             <property name="valign">center</property>
             <property name="width-request">220</property>
             <property name="height-request">30</property>
-            <property name="model">
-              <object class="GtkStringList">
-                <items>
-		  <item translatable="yes">Abu Dhabi</item>
-                  <item translatable="yes">Helsinki</item>
-                </items>
-              </object>
-            </property>
+	    <property name="expression">
+              <lookup name="display" type="DataGObject"/>
+	    </property>
           </object>
         </child>
       </object>

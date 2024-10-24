@@ -3,6 +3,7 @@ use gtk::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib, CompositeTemplate, Stack, Image, Button, ToggleButton, MenuButton, ListView, SingleSelection, CustomFilter, SignalListItemFactory, FilterListModel, ListItem,};
 use glib::{Binding, Object, Variant};
+use gio::ListStore;
 
 use crate::application::ControlPanelGuiApplication;
 use crate::vm_gobject::VMGObject;
@@ -311,5 +312,13 @@ impl ControlPanelGuiWindow {
 
     fn set_vm_details(&self, vm_obj: &VMGObject) {
         self.imp().vm_settings_box.bind(vm_obj);
+    }
+
+    pub fn set_locale_model(&self, store: ListStore) {
+        self.imp().settings_box.set_locale_model(store);
+    }
+
+    pub fn set_timezone_model(&self, store: ListStore) {
+        self.imp().settings_box.set_timezone_model(store);
     }
 }

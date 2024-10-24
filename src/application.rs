@@ -1,11 +1,13 @@
 
 use std::cell::RefCell;
+use std::process::Command;
 use std::rc::Rc;
 use gtk::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib, gdk};
 use gtk::CssProvider;
 use glib::Variant;
+use gio::ListStore;
 
 use crate::ControlPanelGuiWindow;
 use crate::data_provider::imp::DataProvider;
@@ -13,6 +15,7 @@ use crate::connection_config::ConnectionConfig;
 use crate::vm_control_action::VMControlAction;
 use crate::settings_action::SettingsAction;
 use crate::add_network_popup::AddNetworkPopup;
+use crate::data_gobject::DataGObject;
 
 mod imp {
     use super::*;
@@ -59,6 +62,110 @@ mod imp {
                 window
             } else {
                 let window = ControlPanelGuiWindow::new(&*application);
+
+                let (tx_lang, rx_lang) = async_channel::bounded(1);
+                let (tx_tz, rx_tz) = async_channel::bounded(1);
+                std::thread::spawn(move || {
+                    if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
+                        let output = Command::new("locale").arg("-va").output()?;
+                        let mut locale = None;
+                        let mut lang = None;
+                        let mut terr = None;
+                        let mut locales = Vec::new();
+                        for line in String::from_utf8(output.stdout)?
+                            .lines()
+                            .map(str::trim)
+                            .chain(std::iter::once(""))
+                        {
+                            if line.is_empty() {
+                                if let Some((locale, lang, terr)) = locale
+                                    .take()
+                                    .map(|loc: String| (loc, lang.take(), terr.take()))
+                                {
+                                    if locale
+                                        .chars()
+                                        .next()
+                                        .is_some_and(|c| c.is_ascii_lowercase())
+                                    {
+                                        let lang = lang
+                                            .map(|lang| {
+                                                if let Some(terr) = terr {
+                                                    format!("{lang} ({terr})")
+                                                } else {
+                                                    lang
+                                                }
+                                            })
+                                            .unwrap_or_else(|| locale.clone());
+                                        locales.push((locale, lang));
+                                    }
+                                }
+                            }
+                            if let Some(loc) = line
+                                .strip_prefix("locale: ")
+                                .and_then(|l| l.split_once(' ').map(|(a, _)| a))
+                            {
+                                locale = Some(loc.to_owned());
+                            } else if let Some(lan) = line.strip_prefix("language | ") {
+                                lang = Some(lan.to_owned());
+                            } else if let Some(ter) = line.strip_prefix("territory | ") {
+                                terr = Some(ter.to_owned());
+                            }
+                        }
+                        Ok(tx_lang.send_blocking(locales)?)
+                    })() {
+                        println!("Getting locales failed: {e}, using defaults");
+                        drop(tx_lang);
+                    }
+
+                    if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
+                        let output = Command::new("timedatectl").arg("list-timezones").output()?;
+                        let data = String::from_utf8(output.stdout)?
+                            .lines()
+                            .map(String::from)
+                            .collect();
+                        Ok(tx_tz.send_blocking(data)?)
+                    })() {
+                        println!("Getting timezones failed: {e}, using defaults");
+                    }
+                });
+
+                let win = window.clone();
+                glib::spawn_future_local(async move {
+                    let data = rx_lang.recv().await.unwrap_or_else(|_| {
+                        vec![
+                            (String::from("ar_AE.UTF-8"), String::from("Arabic (UAE)")),
+                            (
+                                String::from("en_US.UTF-8"),
+                                String::from("English (United States)"),
+                            ),
+                        ]
+                    });
+                    let data: Vec<_> = data
+                        .into_iter()
+                        .map(|(loc, lang)| DataGObject::new(loc, lang))
+                        .collect();
+                    let store = ListStore::new::<DataGObject>();
+                    store.extend_from_slice(&data);
+                    win.set_locale_model(store);
+
+                    let data = rx_tz.recv().await.unwrap_or_else(|_| {
+                        vec![
+                            String::from("Europe/Helsinki"),
+                            String::from("Asia/Abu_Dhabi"),
+                        ]
+                    });
+                    let data: Vec<_> = data
+                        .into_iter()
+                        .map(|l| {
+                            let display =
+                                l.chars().map(|c| if c == '_' { ' ' } else { c }).collect();
+                            DataGObject::new(l, display)
+                        })
+                        .collect();
+                    let store = ListStore::new::<DataGObject>();
+                    store.extend_from_slice(&data);
+                    win.set_timezone_model(store);
+                });
                 window.upcast()
             };
 
@@ -81,6 +188,7 @@ glib::wrapper! {
 
 impl ControlPanelGuiApplication {
     pub fn new(application_id: &str, flags: &gio::ApplicationFlags, address: String, port: u16) -> Self {
+        let _ = DataGObject::static_type();
         let app: Self = glib::Object::builder()
             .property("application-id", application_id)
             .property("flags", flags)
@@ -184,15 +292,9 @@ impl ControlPanelGuiApplication {
             SettingsAction::AddNetwork => todo!(),
             SettingsAction::RemoveNetwork => todo!(),
             SettingsAction::RegionNLanguage => {
-                let (locale, timezone) : (String, String) = value.get().unwrap();
-                self.imp()
-                    .data_provider
-                    .borrow()
-                    .set_locale(locale);
-                self.imp()
-                    .data_provider
-                    .borrow()
-                    .set_timezone(timezone);
+                let (locale, timezone): (String, String) = value.get().unwrap();
+                self.imp().data_provider.borrow().set_locale(locale);
+                self.imp().data_provider.borrow().set_timezone(timezone);
             }
             SettingsAction::DateNTime => todo!(),
             SettingsAction::MouseSpeed => todo!(),

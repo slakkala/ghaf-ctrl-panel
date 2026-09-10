@@ -68,6 +68,9 @@ mod imp {
         // tries to launch a "second instance" of the application. When they try
         // to do that, we'll just present any existing window.
         fn activate(&self) {
+            info!("application activated!");
+            #[cfg(feature = "test-automation")]
+            info!("test-automation enabled");
             let application = self.obj();
             //load CSS styles
             Self::load_css();
@@ -107,7 +110,13 @@ mod imp {
             };
 
             // Ask the window manager/compositor to present the window
+            info!("Presenting window");
             window.present();
+
+            #[cfg(feature = "test-automation")]
+            info!("Setting up test automation");
+            #[cfg(feature = "test-automation")]
+            crate::test_automation::setup(&self.obj());
         }
     }
 

@@ -33,6 +33,7 @@ givc-common = { git = "https://github.com/tiiuae/ghaf-givc", branch = "main", fe
 
 [features]
 mock = []
+test-automation = []
 
 [lints.clippy]
 pedantic = "deny"

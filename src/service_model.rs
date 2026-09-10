@@ -32,7 +32,7 @@ mod imp {
     use givc_client::endpoint::TlsConfig;
     use givc_client::{self, AdminClient};
     #[cfg(not(feature = "mock"))]
-    use givc_common::pb::admin::{AvailableUpdate, RegistryPullResult};
+    use givc_common::pb::update::{AvailableUpdate, RegistryPullResult};
     use givc_common::{address::EndpointAddress, query::Event};
     use glib::JoinHandle;
     use glib::{Object, Properties, SourceId};
@@ -281,9 +281,7 @@ mod imp {
             let model = self.obj().clone();
 
             if let Some(source_id) = guard.replace(glib::timeout_add_local_once(delay, move || {
-                glib::spawn_future_local(async move {
-                    model.imp().reconnect().await;
-                });
+                model.imp().reconnect();
             })) {
                 source_id.remove();
             }
@@ -559,7 +557,7 @@ mod imp {
 
         #[cfg(feature = "mock")]
         #[allow(clippy::unused_async)]
-        async fn reconnect(&self) {
+        fn reconnect(&self) {
             use givc_common::query::{TrustLevel, VMStatus};
             use givc_common::types::{ServiceType, VmType};
             self.fill_by_mock_data();
@@ -719,11 +717,11 @@ mod imp {
 
         #[cfg(not(feature = "mock"))]
         #[allow(clippy::cast_possible_truncation)]
-        async fn reconnect(&self) {
+        fn reconnect(&self) {
             let _ = self.task_runner.borrow_mut().take();
             let join = self.join_handle.borrow_mut().take();
             if let Some(join) = join {
-                let _ = join.await;
+                join.abort();
             }
             if self.address.borrow().is_empty() || self.port.get() == 0 {
                 return;
@@ -760,11 +758,6 @@ mod imp {
                                         return;
                                     }
                                 },
-                                () = async {
-                                    while task_rx.recv().await.is_ok() {
-                                        debug!("Not yet connected, task ignored");
-                                    }
-                                } => return,
                             }
                         };
                         debug!("Connected!");
@@ -930,11 +923,16 @@ mod imp {
             let result = self
                 .client_cmd(async move |client| {
                     client
-                        .pull_update(reference, destination, true, auth, insecure, move |progress| {
+                        .pull_update(
+                            reference,
+                            destination,
+                            auth,
+                            insecure,
+                            move |progress: givc_common::pb::update::RegistryPullProgress| {
                             let progress_tx = progress_tx.clone();
                             async move {
                                 let progress = match progress.event {
-                                    Some(givc_common::pb::registry_pull_progress::Event::BlobDownloading(blob)) => {
+                                    Some(givc_common::pb::update::registry_pull_progress::Event::BlobDownloading(blob)) => {
                                         blob.total.map_or(0.0, |total| {
                                             if total == 0 {
                                                 0.0
@@ -943,16 +941,17 @@ mod imp {
                                             }
                                         })
                                     }
-                                    Some(givc_common::pb::registry_pull_progress::Event::BlobVerified(_) |
-givc_common::pb::registry_pull_progress::Event::ManifestWritten(_) |
-givc_common::pb::registry_pull_progress::Event::Done(_)) => 1.0,
-                                    Some(givc_common::pb::registry_pull_progress::Event::PullStarted(_)
-                                        | givc_common::pb::registry_pull_progress::Event::Cancelled(_))
+                                    Some(givc_common::pb::update::registry_pull_progress::Event::BlobVerified(_)
+                                        | givc_common::pb::update::registry_pull_progress::Event::ManifestWritten(_)
+                                        | givc_common::pb::update::registry_pull_progress::Event::Done(_)) => 1.0,
+                                    Some(givc_common::pb::update::registry_pull_progress::Event::PullStarted(_)
+                                        | givc_common::pb::update::registry_pull_progress::Event::Cancelled(_))
                                     | None => 0.0,
                                 };
                                 let _ = progress_tx.send(progress).await;
                             }
-                        })
+                        },
+                        )
                         .await
                 })
                 .await;
@@ -993,7 +992,7 @@ givc_common::pb::registry_pull_progress::Event::Done(_)) => 1.0,
             });
 
             let result = self
-                .client_cmd(async move |client| client.image_install(manifest_path, true).await)
+                .client_cmd(async move |client| client.image_install(manifest_path).await)
                 .await;
 
             match result {

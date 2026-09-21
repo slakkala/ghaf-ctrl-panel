@@ -50,10 +50,7 @@ pub fn setup(app: &ControlPanelGuiApplication) {
 
     std::thread::spawn(move || {
         debug!("Test automation listener thread started");
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else {
-                continue;
-            };
+        for mut stream in listener.incoming().filter_map(Result::ok) {
             let mut reader = BufReader::new(&mut stream);
             let mut action = String::new();
 
@@ -81,7 +78,7 @@ pub fn setup(app: &ControlPanelGuiApplication) {
     });
 
     glib::spawn_future_local(glib::clone!(
-        #[strong(rename_to = app)]
+        #[strong]
         app,
         async move {
             while let Ok(command) = action_rx.recv().await {

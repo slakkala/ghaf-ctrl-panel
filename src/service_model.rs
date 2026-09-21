@@ -709,7 +709,7 @@ mod imp {
         }
 
         #[cfg(feature = "mock")]
-        #[allow(clippy::unused_async)]
+        #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
         pub(super) async fn start_update_server_oauth_flow(&self) -> Result<(), anyhow::Error> {
             info!("ServiceModel: mocked update-server OAuth flow requested");
             Ok(())
@@ -1085,7 +1085,7 @@ impl ServiceModel {
             .await
     }
 
-    #[allow(clippy::unused_async)]
+    #[allow(clippy::unused_async, clippy::unused_async_trait_impl)]
     pub async fn restart_service(
         &self,
         _obj: &ServiceGObject,
@@ -1168,7 +1168,7 @@ impl ServiceModel {
     }
 
     #[cfg(feature = "mock")]
-    #[allow(clippy::unused_async, clippy::unused_self)]
+    #[allow(clippy::unused_async, clippy::unused_async_trait_impl, clippy::unused_self)]
     pub async fn get_sysinfo_status_from_host(&self) -> Result<HostSysinfoStatus, anyhow::Error> {
         Ok(HostSysinfoStatus {
             ghaf_version: "0.0.0-mock".to_string(),

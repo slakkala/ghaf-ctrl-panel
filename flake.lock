@@ -18,7 +18,7 @@
     "devshell": {
       "inputs": {
         "nixpkgs": [
-          "ghaf-givc",
+          "givc",
           "nixpkgs"
         ]
       },
@@ -71,7 +71,7 @@
     "flake-parts": {
       "inputs": {
         "nixpkgs-lib": [
-          "ghaf-givc",
+          "givc",
           "nixpkgs"
         ]
       },
@@ -137,7 +137,74 @@
         "type": "github"
       }
     },
-    "ghaf-givc": {
+    "ghafpkgs": {
+      "inputs": {
+        "crane": [
+          "givc",
+          "crane"
+        ],
+        "devshell": [
+          "givc",
+          "devshell"
+        ],
+        "flake-compat": "flake-compat",
+        "flake-parts": [
+          "givc",
+          "flake-parts"
+        ],
+        "flake-root": "flake-root_2",
+        "git-hooks-nix": "git-hooks-nix",
+        "nixpkgs": [
+          "givc",
+          "nixpkgs"
+        ],
+        "treefmt-nix": [
+          "givc",
+          "treefmt-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788015051,
+        "narHash": "sha256-xy/wfKCR+bVYXzl4iKJnxmhtSuzeyARmzI6auYcgUXg=",
+        "owner": "tiiuae",
+        "repo": "ghafpkgs",
+        "rev": "c6c2a9f36642cb29c9db1f0c361620f3777eff16",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tiiuae",
+        "repo": "ghafpkgs",
+        "type": "github"
+      }
+    },
+    "git-hooks-nix": {
+      "inputs": {
+        "flake-compat": [
+          "givc",
+          "ghafpkgs",
+          "flake-compat"
+        ],
+        "nixpkgs": [
+          "givc",
+          "ghafpkgs",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787424939,
+        "narHash": "sha256-O2tBn84NNuHrnqNVxx/XqsXwfYvS1YwBh+7CBnbCYsk=",
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "rev": "809414f0cdadf82cf11b06c2b29ba9b3168b3297",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "type": "github"
+      }
+    },
+    "givc": {
       "inputs": {
         "crane": [
           "crane"
@@ -169,73 +236,6 @@
         "url": "https://github.com/tiiuae/ghaf-givc"
       }
     },
-    "ghafpkgs": {
-      "inputs": {
-        "crane": [
-          "ghaf-givc",
-          "crane"
-        ],
-        "devshell": [
-          "ghaf-givc",
-          "devshell"
-        ],
-        "flake-compat": "flake-compat",
-        "flake-parts": [
-          "ghaf-givc",
-          "flake-parts"
-        ],
-        "flake-root": "flake-root_2",
-        "git-hooks-nix": "git-hooks-nix",
-        "nixpkgs": [
-          "ghaf-givc",
-          "nixpkgs"
-        ],
-        "treefmt-nix": [
-          "ghaf-givc",
-          "treefmt-nix"
-        ]
-      },
-      "locked": {
-        "lastModified": 1788015051,
-        "narHash": "sha256-xy/wfKCR+bVYXzl4iKJnxmhtSuzeyARmzI6auYcgUXg=",
-        "owner": "tiiuae",
-        "repo": "ghafpkgs",
-        "rev": "c6c2a9f36642cb29c9db1f0c361620f3777eff16",
-        "type": "github"
-      },
-      "original": {
-        "owner": "tiiuae",
-        "repo": "ghafpkgs",
-        "type": "github"
-      }
-    },
-    "git-hooks-nix": {
-      "inputs": {
-        "flake-compat": [
-          "ghaf-givc",
-          "ghafpkgs",
-          "flake-compat"
-        ],
-        "nixpkgs": [
-          "ghaf-givc",
-          "ghafpkgs",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1787424939,
-        "narHash": "sha256-O2tBn84NNuHrnqNVxx/XqsXwfYvS1YwBh+7CBnbCYsk=",
-        "owner": "cachix",
-        "repo": "git-hooks.nix",
-        "rev": "809414f0cdadf82cf11b06c2b29ba9b3168b3297",
-        "type": "github"
-      },
-      "original": {
-        "owner": "cachix",
-        "repo": "git-hooks.nix",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1789754019,
@@ -256,7 +256,7 @@
       "inputs": {
         "flake-compat": "flake-compat_2",
         "nixpkgs": [
-          "ghaf-givc",
+          "givc",
           "nixpkgs"
         ]
       },
@@ -278,7 +278,7 @@
       "inputs": {
         "crane": "crane",
         "flake-utils": "flake-utils",
-        "ghaf-givc": "ghaf-givc",
+        "givc": "givc",
         "nixpkgs": "nixpkgs",
         "treefmt-nix": "treefmt-nix"
       }

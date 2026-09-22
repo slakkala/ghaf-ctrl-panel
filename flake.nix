@@ -14,7 +14,10 @@
     };
 
     ghaf-givc = {
-      url = "git+https://github.com/slakkala/ghaf-givc?ref=update-gui";
+      url = "git+https://github.com/tiiuae/ghaf-givc?rev=c895849f68e648071356ffc8a21622d91f990cb6";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.crane.follows = "crane";
+      inputs.treefmt-nix.follows = "treefmt-nix";
     };
   };
 

@@ -15,6 +15,9 @@ pub enum UpdateActivity {
         progress: f64,
     },
     Installed,
+    Error {
+        error: String,
+    },
 }
 
 mod imp {

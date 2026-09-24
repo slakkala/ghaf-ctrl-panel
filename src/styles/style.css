@@ -57,7 +57,7 @@ label {
   color: #FFFFFF;
 }
 
-label.required-text {
+label.error-text, label.required-text {
   color: #FF2E00;
 }
 

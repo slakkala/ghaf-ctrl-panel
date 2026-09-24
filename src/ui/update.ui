@@ -219,6 +219,17 @@
                     </child>
 
                     <child>
+                      <object class="GtkLabel" id="error_label">
+                        <property name="visible">false</property>
+                        <property name="hexpand">true</property>
+                        <property name="wrap">true</property>
+                        <style>
+                          <class name="error-text"/>
+                        </style>
+                      </object>
+                    </child>
+
+                    <child>
                       <object class="GtkBox">
                         <property name="vexpand">true</property>
                       </object>

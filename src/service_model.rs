@@ -10,6 +10,8 @@ use crate::service_gobject::ServiceGObject;
 use crate::settings_action::UpdateServerAuthMode;
 pub use crate::update_state::{UpdateActivity, UpdateState};
 
+const UPDATE_SHARED_DIR: &'static str = "/persist/sysupdate";
+
 #[derive(Debug, Clone)]
 pub struct HostSysinfoStatus {
     pub ghaf_version: String,
@@ -604,10 +606,14 @@ mod imp {
         #[cfg(feature = "mock")]
         pub(super) async fn check_for_update(
             &self,
-            _reference: String,
+            reference: String,
             _auth_mode: UpdateServerAuthMode,
             _insecure: bool,
         ) -> Result<(), anyhow::Error> {
+            if reference.trim().is_empty() {
+                anyhow::bail!("update server reference is not configured");
+            }
+
             let current_version = self.load_current_version().await.unwrap_or_else(|err| {
                 warn!("ServiceModel: failed to load current version: {err}");
                 "unknown".to_string()
@@ -645,10 +651,14 @@ mod imp {
         #[cfg(feature = "mock")]
         pub(super) async fn download_update(
             &self,
-            _reference: String,
+            reference: String,
             _auth_mode: UpdateServerAuthMode,
             _insecure: bool,
         ) -> Result<(), anyhow::Error> {
+            if reference.trim().is_empty() {
+                anyhow::bail!("update server reference is not configured");
+            }
+
             if self.update_state.available_version().is_empty() {
                 let current_version = self.load_current_version().await.unwrap_or_else(|err| {
                     warn!("ServiceModel: failed to load current version before download: {err}");
@@ -821,6 +831,38 @@ mod imp {
         }
 
         #[cfg(not(feature = "mock"))]
+        fn version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+            let mut a_parts = a.split('.');
+            let mut b_parts = b.split('.');
+
+            loop {
+                let a_part = a_parts.next();
+                let b_part = b_parts.next();
+
+                match (a_part, b_part) {
+                    (None, None) => break std::cmp::Ordering::Equal,
+                    (Some(_), None) => break std::cmp::Ordering::Greater,
+                    (None, Some(_)) => break std::cmp::Ordering::Less,
+                    (Some(a), Some(b)) => {
+                        if let Ok(av) = a.parse::<u32>()
+                            && let Ok(bv) = b.parse::<u32>()
+                        {
+                            let c = av.cmp(&bv);
+                            if c != std::cmp::Ordering::Equal {
+                                break c;
+                            }
+                        } else {
+                            let c = a.cmp(b);
+                            if c != std::cmp::Ordering::Equal {
+                                break c;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(feature = "mock"))]
         pub(super) async fn check_for_update(
             &self,
             reference: String,
@@ -845,13 +887,19 @@ mod imp {
                 state.set_activity(UpdateActivity::Checking);
             });
 
-            let updates = self
+            let mut updates = self
                 .client_cmd(async move |client| {
                     client.discover_updates(reference, auth, insecure).await
                 })
                 .await?;
 
-            if let Some(update) = updates.into_iter().next() {
+            updates.sort_by(|a, b| Self::version_cmp(&a.version, &b.version).reverse());
+
+            if let Some(update) = updates
+                .into_iter()
+                .next()
+                .filter(|up| up.version != current_version)
+            {
                 let selected_reference = format!("{}:{}", update.repository, update.tag);
                 let changelog = {
                     let selected_reference = selected_reference.clone();
@@ -894,6 +942,8 @@ mod imp {
             auth_mode: UpdateServerAuthMode,
             insecure: bool,
         ) -> Result<(), anyhow::Error> {
+            use givc_common::pb::update::registry_pull_progress::Event;
+
             if self.selected_update_reference().is_none() {
                 self.check_for_update(reference.clone(), auth_mode.clone(), insecure)
                     .await?;
@@ -903,11 +953,10 @@ mod imp {
                 anyhow::bail!("no update is available to download");
             };
             let auth = Self::registry_auth(auth_mode)?;
-            let destination = "/persist/sysupdate".to_string();
             let (progress_tx, progress_rx) = async_channel::unbounded::<f64>();
             let model = self.obj().clone();
 
-            glib::spawn_future_local(async move {
+            let updater = glib::spawn_future_local(async move {
                 while let Ok(progress) = progress_rx.recv().await {
                     model.imp().update_state_with_notifications_frozen(|state| {
                         state.set_activity(UpdateActivity::Downloading {
@@ -926,36 +975,39 @@ mod imp {
                     client
                         .pull_update(
                             reference,
-                            destination,
+                            super::UPDATE_SHARED_DIR.into(),
                             auth,
                             insecure,
                             move |progress: givc_common::pb::update::RegistryPullProgress| {
-                            let progress_tx = progress_tx.clone();
-                            async move {
-                                let progress = match progress.event {
-                                    Some(givc_common::pb::update::registry_pull_progress::Event::BlobDownloading(blob)) => {
-                                        blob.total.map_or(0.0, |total| {
-                                            if total == 0 {
-                                                0.0
-                                            } else {
-                                                blob.downloaded as f64 / total as f64
-                                            }
-                                        })
-                                    }
-                                    Some(givc_common::pb::update::registry_pull_progress::Event::BlobVerified(_)
-                                        | givc_common::pb::update::registry_pull_progress::Event::ManifestWritten(_)
-                                        | givc_common::pb::update::registry_pull_progress::Event::Done(_)) => 1.0,
-                                    Some(givc_common::pb::update::registry_pull_progress::Event::PullStarted(_)
-                                        | givc_common::pb::update::registry_pull_progress::Event::Cancelled(_))
-                                    | None => 0.0,
-                                };
-                                let _ = progress_tx.send(progress).await;
-                            }
-                        },
+                                let progress_tx = progress_tx.clone();
+                                async move {
+                                    let progress = match progress.event {
+                                        Some(Event::BlobDownloading(blob)) => {
+                                            blob.total.map_or(0.0, |total| {
+                                                if total == 0 {
+                                                    0.0
+                                                } else {
+                                                    blob.downloaded as f64 / total as f64
+                                                }
+                                            })
+                                        }
+                                        Some(
+                                            Event::BlobVerified(_)
+                                            | Event::ManifestWritten(_)
+                                            | Event::Done(_),
+                                        ) => 1.0,
+                                        Some(Event::PullStarted(_) | Event::Cancelled(_))
+                                        | None => 0.0,
+                                    };
+                                    let _ = progress_tx.send(progress).await;
+                                }
+                            },
                         )
                         .await
                 })
                 .await;
+
+            let _ = updater.await;
 
             match result {
                 Ok(result) => {
@@ -1021,7 +1073,7 @@ mod imp {
         #[cfg(not(feature = "mock"))]
         #[allow(clippy::unused_async)]
         pub(super) async fn start_update_server_oauth_flow(&self) -> Result<(), anyhow::Error> {
-            unimplemented!("update server OAuth flow is mocked only for now")
+            anyhow::bail!("Update server OAuth is not implemented yet");
         }
     }
 }
@@ -1051,8 +1103,20 @@ impl ServiceModel {
         });
     }
 
+    fn set_update_error(&self, error: &anyhow::Error) {
+        self.imp()
+            .update_state_with_notifications_frozen(|state| {
+                state.set_activity(UpdateActivity::Error {
+                    error: error.to_string(),
+                });
+            });
+    }
+
     pub async fn start_update_server_oauth_flow(&self) -> Result<(), anyhow::Error> {
-        self.imp().start_update_server_oauth_flow().await
+        self.imp()
+            .start_update_server_oauth_flow()
+            .await
+            .inspect_err(|err| self.set_update_error(err))
     }
 
     pub async fn start_service(&self, obj: ServiceGObject) -> Result<StartResponse, anyhow::Error> {
@@ -1169,7 +1233,11 @@ impl ServiceModel {
     }
 
     #[cfg(feature = "mock")]
-    #[allow(clippy::unused_async, clippy::unused_async_trait_impl, clippy::unused_self)]
+    #[allow(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        clippy::unused_self
+    )]
     pub async fn get_sysinfo_status_from_host(&self) -> Result<HostSysinfoStatus, anyhow::Error> {
         Ok(HostSysinfoStatus {
             ghaf_version: "0.0.0-mock".to_string(),
@@ -1187,6 +1255,7 @@ impl ServiceModel {
         self.imp()
             .check_for_update(reference, auth_mode, insecure)
             .await
+            .inspect_err(|err| self.set_update_error(err))
     }
 
     pub async fn download_update(
@@ -1198,9 +1267,13 @@ impl ServiceModel {
         self.imp()
             .download_update(reference, auth_mode, insecure)
             .await
+            .inspect_err(|err| self.set_update_error(err))
     }
 
     pub async fn update_request(&self) -> Result<(), anyhow::Error> {
-        self.imp().apply_update().await
+        self.imp()
+            .apply_update()
+            .await
+            .inspect_err(|err| self.set_update_error(err))
     }
 }

@@ -128,6 +128,9 @@ mod imp {
         pub update_server_password: TemplateChild<Entry>,
         #[template_child]
         pub update_server_oauth_button: TemplateChild<Button>,
+        #[template_child]
+        pub error_label: TemplateChild<Label>,
+
         pub(super) config_loading: Cell<bool>,
         pub(super) refresh_cancel: RefCell<Option<CancelGuard>>,
         pub(super) bindings: RefCell<Vec<glib::Binding>>,
@@ -313,6 +316,7 @@ impl UpdatePage {
         imp.operation_progress.set_visible(false);
         imp.download_button.set_visible(false);
         imp.update_button.set_visible(false);
+        imp.error_label.set_visible(false);
     }
 
     fn set_idle_state(&self) {
@@ -388,6 +392,13 @@ impl UpdatePage {
         self.reset_transient_update_ui();
         imp.check_button.set_widget_state(WidgetState::Invisible);
         imp.install_finished_box.set_visible(true);
+    }
+
+    fn set_error_state(&self, error: &str) {
+        let imp = self.imp();
+        self.set_idle_state();
+        imp.error_label.set_text(error);
+        imp.error_label.set_visible(true);
     }
 
     fn stop_operation_progress_activity(&self) {
@@ -667,6 +678,7 @@ impl UpdatePage {
                 self.set_installing_state(update_available);
             }
             UpdateActivity::Installed => self.set_installed_state(),
+            UpdateActivity::Error { ref error } => self.set_error_state(error),
         }
 
         if matches!(previous_activity, UpdateActivity::Installing { .. })

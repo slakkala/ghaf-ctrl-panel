@@ -329,11 +329,11 @@ impl UpdatePage {
         imp.operation_progress
             .set_widget_state(WidgetState::Sensitive);
         imp.operation_progress.pulse();
-        imp.operation_progress.set_fraction(0.0);
         imp.operation_progress.set_text(Some("Checking"));
     }
 
     fn set_checked_state(&self, update_available: bool) {
+        self.reset_transient_update_ui();
         let imp = self.imp();
         imp.check_button.set_widget_state(if update_available {
             WidgetState::Invisible
@@ -346,6 +346,7 @@ impl UpdatePage {
     }
 
     fn set_downloading_state(&self, update_available: bool, progress: f64) {
+        self.reset_transient_update_ui();
         let imp = self.imp();
         imp.check_button.set_widget_state(WidgetState::Invisible);
         imp.update_details_box.set_visible(update_available);
@@ -361,6 +362,7 @@ impl UpdatePage {
     }
 
     fn set_downloaded_state(&self, update_available: bool) {
+        self.reset_transient_update_ui();
         let imp = self.imp();
         imp.check_button.set_widget_state(WidgetState::Invisible);
         imp.update_details_box.set_visible(update_available);
@@ -368,6 +370,7 @@ impl UpdatePage {
     }
 
     fn set_installing_state(&self, update_available: bool) {
+        self.reset_transient_update_ui();
         let imp = self.imp();
         imp.check_button.set_widget_state(WidgetState::Invisible);
         imp.update_details_box.set_visible(update_available);

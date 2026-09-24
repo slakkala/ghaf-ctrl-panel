@@ -281,6 +281,7 @@ mod imp {
             let model = self.obj().clone();
 
             if let Some(source_id) = guard.replace(glib::timeout_add_local_once(delay, move || {
+                *model.imp().reconnect_timeout.borrow_mut() = None;
                 model.imp().reconnect();
             })) {
                 source_id.remove();

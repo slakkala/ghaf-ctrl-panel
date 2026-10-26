@@ -888,11 +888,14 @@ mod imp {
                 state.set_activity(UpdateActivity::Checking);
             });
 
-            let mut updates = self
+            let mut updates: Vec<_> = self
                 .client_cmd(async move |client| {
                     client.discover_updates(reference, auth, insecure).await
                 })
-                .await?;
+                .await?
+                .into_iter()
+                .filter(|update| update.tag.starts_with("prod-"))
+                .collect();
 
             updates.sort_by(|a, b| Self::version_cmp(&a.version, &b.version).reverse());
 

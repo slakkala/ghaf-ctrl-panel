@@ -912,7 +912,7 @@ mod imp {
                     .await
                     .unwrap_or_else(|err| {
                         warn!("ServiceModel: failed to fetch changelog: {err}");
-                        String::new()
+                        "Changelog is not available.".to_string()
                     })
                 };
 
